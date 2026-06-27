@@ -28,7 +28,7 @@ connectionString = NpgsqlConnectionHelper.Normalize(connectionString);
 
 // --- Services --------------------------------------------------------------
 builder.Services.AddDbContext<IdentityDbContext>(opt =>
-    opt.UseNpgsql(connectionString, npg => npg.MigrationsHistoryTable("__ef_migrations", "identity")));
+    opt.UseNpgsql(connectionString));
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<SigningKeyProvider>();
@@ -84,17 +84,47 @@ builder.Services.AddAuthorization();
 var app = builder.Build();
 
 // --- Create schema + seed on boot (Railway has no shell step) --------------
-// Use EnsureCreated to build the schema directly from the model. This is
-// reliable for a fresh database and avoids any dependency on migration
-// discovery. (Once the EF CLI is available locally, this can be switched to
-// MigrateAsync for versioned schema changes.)
+// EnsureCreated() is unreliable when the database has any leftover EF state
+// (it silently no-ops). To be deterministic, we check whether our actual table
+// exists and, if not, generate and run the create-schema SQL directly from the
+// model. This does not depend on migration discovery or EnsureCreated's
+// internal "already exists" heuristic.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-    logger.LogInformation("Ensuring database schema exists.");
-    await db.Database.EnsureCreatedAsync();
+    var tablesExist = false;
+    try
+    {
+        var conn = db.Database.GetDbConnection();
+        await conn.OpenAsync();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText =
+            "SELECT to_regclass('identity.\"Roles\"') IS NOT NULL;";
+        var result = await cmd.ExecuteScalarAsync();
+        tablesExist = result is bool b && b;
+        await conn.CloseAsync();
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Could not check for existing tables; will attempt to create.");
+    }
+
+    if (!tablesExist)
+    {
+        logger.LogInformation("Schema not found. Generating and creating schema from model.");
+        // Clear any partial 'identity' schema so the generated CREATE never
+        // collides with leftover objects, then build fresh from the model.
+        await db.Database.ExecuteSqlRawAsync("DROP SCHEMA IF EXISTS identity CASCADE;");
+        var createSql = db.Database.GenerateCreateScript();
+        await db.Database.ExecuteSqlRawAsync(createSql);
+        logger.LogInformation("Schema created.");
+    }
+    else
+    {
+        logger.LogInformation("Schema already present.");
+    }
 
     await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedAsync();
 }
