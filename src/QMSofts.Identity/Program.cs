@@ -83,11 +83,19 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// --- Migrate + seed on boot (Railway has no shell step) --------------------
+// --- Create schema + seed on boot (Railway has no shell step) --------------
+// Use EnsureCreated to build the schema directly from the model. This is
+// reliable for a fresh database and avoids any dependency on migration
+// discovery. (Once the EF CLI is available locally, this can be switched to
+// MigrateAsync for versioned schema changes.)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-    await db.Database.MigrateAsync();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    logger.LogInformation("Ensuring database schema exists.");
+    await db.Database.EnsureCreatedAsync();
+
     await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedAsync();
 }
 
