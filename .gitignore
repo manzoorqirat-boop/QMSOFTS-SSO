@@ -1,0 +1,20 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# Node / Vite (shell)
+node_modules/
+dist/
+*.local
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never commit signing keys or real appsettings overrides
+*.pem
+appsettings.Production.json
+appsettings.Local.json
