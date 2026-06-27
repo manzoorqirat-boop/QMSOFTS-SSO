@@ -3,7 +3,7 @@ import { APP_REGISTRY } from "../lib/appRegistry";
 import { launchApp } from "../lib/handoff";
 import { BrandHeader } from "./BrandHeader";
 
-export function Launcher() {
+export function Launcher({ onOpenAdmin }: { onOpenAdmin: () => void }) {
   const { user, signOut } = useAuth();
 
   // localStorage holds the refresh token used for app handoff.
@@ -13,6 +13,7 @@ export function Launcher() {
   const entitled = APP_REGISTRY.filter((app) => user?.apps.includes(app.key));
 
   const firstName = user?.name?.split(" ")[0] ?? "";
+  const isAdmin = user?.roles.includes("Admin") ?? false;
 
   return (
     <div className="frame">
@@ -23,9 +24,16 @@ export function Launcher() {
           <p className="greeting">
             Welcome, <span className="accent">{firstName}</span>
           </p>
-          <button className="signout" onClick={signOut}>
-            Sign out
-          </button>
+          <div className="head-actions">
+            {isAdmin && (
+              <button className="btn-small" onClick={onOpenAdmin}>
+                User Admin
+              </button>
+            )}
+            <button className="signout" onClick={signOut}>
+              Sign out
+            </button>
+          </div>
         </div>
 
         {entitled.length === 0 ? (
