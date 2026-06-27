@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using QMSofts.Identity;
 using QMSofts.Identity.Data;
 using QMSofts.Identity.Services;
 
