@@ -10,11 +10,18 @@ var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 // --- Configuration sanity (fail fast) -------------------------------------
-var connectionString =
-    builder.Configuration.GetConnectionString("Identity")
-    ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+// Resolve the connection from several sources, treating empty/whitespace as
+// "not set" (appsettings ships an empty placeholder, and Railway injects
+// DATABASE_URL). First non-blank wins.
+static string? FirstNonBlank(params string?[] values) =>
+    values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
+var connectionString = FirstNonBlank(
+        Environment.GetEnvironmentVariable("DATABASE_URL"),
+        builder.Configuration["ConnectionStrings:Identity"],
+        builder.Configuration.GetConnectionString("Identity"))
     ?? throw new InvalidOperationException(
-        "No database connection. Set ConnectionStrings:Identity or DATABASE_URL.");
+        "No database connection. Set DATABASE_URL or ConnectionStrings:Identity.");
 
 // Railway/Heroku-style URLs need converting to Npgsql keyword form.
 connectionString = NpgsqlConnectionHelper.Normalize(connectionString);
