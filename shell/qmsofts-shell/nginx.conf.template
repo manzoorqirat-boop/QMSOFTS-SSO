@@ -1,0 +1,19 @@
+# SPA serving config. ${PORT} is substituted at container start from Railway's
+# injected PORT env var (see Dockerfile entrypoint).
+server {
+    listen       ${PORT};
+    server_name  _;
+    root         /usr/share/nginx/html;
+    index        index.html;
+
+    # SPA fallback: unknown routes return index.html so client routing works.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Cache built assets aggressively; they are content-hashed by Vite.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
