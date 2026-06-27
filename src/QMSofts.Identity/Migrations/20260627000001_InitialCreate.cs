@@ -1,11 +1,15 @@
 using System;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using QMSofts.Identity.Data;
 
 #nullable disable
 
 namespace QMSofts.Identity.Migrations;
 
+[DbContext(typeof(IdentityDbContext))]
+[Migration("20260627000001_InitialCreate")]
 public partial class InitialCreate : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
