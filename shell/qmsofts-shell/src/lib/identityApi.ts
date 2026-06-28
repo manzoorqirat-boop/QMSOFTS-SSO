@@ -35,6 +35,10 @@ export class SessionDecisionRequired extends Error {
   activeSessionIp: string | null;
   constructor(activeSessionIp: string | null) {
     super("You are already logged in on another session.");
+    // Restore the prototype chain — without this, `instanceof` fails when this
+    // class (extending the built-in Error) is transpiled down by Vite/TS.
+    Object.setPrototypeOf(this, SessionDecisionRequired.prototype);
+    this.name = "SessionDecisionRequired";
     this.activeSessionIp = activeSessionIp;
   }
 }
@@ -49,15 +53,26 @@ export async function login(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, sessionDecision }),
   });
-  if (res.status === 409) {
-    const body = await res.json();
-    if (body?.requiresSessionDecision)
-      throw new SessionDecisionRequired(body.activeSessionIp ?? null);
+
+  // Read the body exactly once (a Response body can only be consumed one time).
+  let body: any = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = null;
   }
-  if (!res.ok) throw new Error(await parseError(res));
-  const data = await res.json();
-  if (data?.loggedOut) return { loggedOut: true };
-  return data as LoginResult;
+
+  // Concurrent session — backend returns 409 with requiresSessionDecision.
+  if (res.status === 409 && body?.requiresSessionDecision) {
+    throw new SessionDecisionRequired(body.activeSessionIp ?? null);
+  }
+
+  if (!res.ok) {
+    throw new Error(body?.error ?? `Request failed (${res.status}).`);
+  }
+
+  if (body?.loggedOut) return { loggedOut: true };
+  return body as LoginResult;
 }
 
 export async function refresh(refreshToken: string): Promise<TokenResponse> {
