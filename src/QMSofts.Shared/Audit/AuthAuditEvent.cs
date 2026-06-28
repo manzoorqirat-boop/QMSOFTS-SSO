@@ -23,7 +23,21 @@ public enum AuthAuditEventType
     /// <summary>A valid token tried to enter an app it isn't entitled to.</summary>
     AppEntryDenied = 14,
     /// <summary>Re-authentication tied to an electronic signature action.</summary>
-    SignatureAuthentication = 15
+    SignatureAuthentication = 15,
+
+    // ── Session lifecycle (ERES parity) ──
+    LoginBlocked = 16,           // status Inactive/Disabled/locked at login
+    SessionExpired = 17,
+    SessionSuperseded = 18,      // token sid no longer the active one
+    SessionReplaced = 19,        // user chose "replace" on concurrent login
+    SessionLogoutAll = 20,       // user chose "log out all"
+    ConcurrentLoginBlocked = 21, // active session exists; decision required
+    ForceLogoutApplied = 22,     // admin force-logout took effect
+    AccountAutoUnlocked = 23,    // lockout window elapsed on successful login
+    PasswordExpired = 24,        // expiry policy forced change
+    PasswordChangeFailed = 25,
+    UserReactivated = 26,
+    SettingChanged = 27
 }
 
 /// <summary>
