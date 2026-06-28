@@ -32,15 +32,24 @@ export interface LoginResult extends TokenResponse {
 
 // Concurrent-session signal (HTTP 409) the caller may act on.
 export class SessionDecisionRequired extends Error {
+  // A plain discriminator flag — reliable even if `instanceof` breaks across
+  // module/transpile boundaries. Check this, not just instanceof.
+  readonly isSessionDecision = true as const;
   activeSessionIp: string | null;
   constructor(activeSessionIp: string | null) {
     super("You are already logged in on another session.");
-    // Restore the prototype chain — without this, `instanceof` fails when this
-    // class (extending the built-in Error) is transpiled down by Vite/TS.
     Object.setPrototypeOf(this, SessionDecisionRequired.prototype);
     this.name = "SessionDecisionRequired";
     this.activeSessionIp = activeSessionIp;
   }
+}
+
+/** Reliable type guard for the concurrent-session signal. */
+export function isSessionDecisionError(e: unknown): e is SessionDecisionRequired {
+  return (
+    e instanceof SessionDecisionRequired ||
+    (typeof e === "object" && e !== null && (e as any).isSessionDecision === true)
+  );
 }
 
 export async function login(
