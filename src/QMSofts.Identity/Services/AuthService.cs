@@ -137,37 +137,21 @@ public sealed class AuthService
         user.FailedLoginCount = 0;
         user.LockedUntil = null;
 
-        // ── Single active session enforcement ──
+        // ── Single active session: a new login always wins ──
+        // If another session is active, we automatically log it out and open a
+        // fresh one. The previous session's token is invalidated (its sid stops
+        // matching, and ForceLogoutAt predates only older tokens). No prompt.
         var now = DateTimeOffset.UtcNow;
-        var hasActive = user.ActiveSessionId is not null
+        var hadActive = user.ActiveSessionId is not null
             && user.SessionExpiresAt is { } exp && exp > now;
-        var decision = req.SessionDecision; // null | "replace" | "logoutAll"
 
-        if (hasActive && string.IsNullOrEmpty(decision))
+        if (hadActive)
         {
-            await _audit.RecordAsync(AuthAuditEventType.ConcurrentLoginBlocked, user.Id, req.Email,
-                detail: $"active session from {user.SessionIp ?? "unknown"}", ct: ct);
-            return AuthResult.NeedSessionDecision(user.SessionIp);
-        }
-
-        if (hasActive && decision == "logoutAll")
-        {
-            user.ActiveSessionId = null;
-            user.SessionIssuedAt = null;
-            user.SessionExpiresAt = null;
-            user.SessionIp = null;
-            user.ForceLogoutAt = now; // invalidate any prior token
-            await _db.SaveChangesAsync(ct);
-            await _audit.RecordAsync(AuthAuditEventType.SessionLogoutAll, user.Id, req.Email,
-                detail: "all sessions logged out by user choice", ct: ct);
-            return AuthResult.LoggedOut();
-        }
-
-        if (hasActive && decision == "replace")
             await _audit.RecordAsync(AuthAuditEventType.SessionReplaced, user.Id, req.Email,
-                detail: $"replaced session from {user.SessionIp ?? "unknown"}", ct: ct);
+                detail: $"previous session from {user.SessionIp ?? "unknown"} logged out by new login", ct: ct);
+        }
 
-        // Open a fresh session.
+        // Open a fresh session (this replaces any previous one).
         var timeoutMins = Math.Max(1, await _settings.GetIntAsync("sessionTimeout", 480, ct));
         var sid = Guid.NewGuid().ToString("N");
         user.ForceLogoutAt = null;
