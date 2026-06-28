@@ -17,8 +17,14 @@ interface AuthState {
   accessToken: string | null;
   loading: boolean;
   error: string | null;
-  signIn: (email: string, password: string) => Promise<void>;
+  mustChangePassword: boolean;
+  signIn: (
+    email: string,
+    password: string,
+    sessionDecision?: "replace" | "logoutAll"
+  ) => Promise<{ mustChangePassword?: boolean; loggedOut?: boolean }>;
   signOut: () => void;
+  clearMustChange: () => void;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -28,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const refreshTimer = useRef<number | null>(null);
 
   const applyTokens = useCallback((t: TokenResponse) => {
@@ -81,12 +88,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(
-    async (email: string, password: string) => {
+    async (
+      email: string,
+      password: string,
+      sessionDecision?: "replace" | "logoutAll"
+    ): Promise<{ mustChangePassword?: boolean; loggedOut?: boolean }> => {
       setError(null);
       try {
-        const t = await api.login(email, password);
-        applyTokens(t);
+        const result = await api.login(email, password, sessionDecision);
+        if ("loggedOut" in result) {
+          return { loggedOut: true };
+        }
+        applyTokens(result);
+        setMustChangePassword(!!result.mustChangePassword);
+        return { mustChangePassword: !!result.mustChangePassword };
       } catch (e) {
+        if (e instanceof api.SessionDecisionRequired) {
+          throw e; // let the login screen prompt for replace/logoutAll
+        }
         setError(e instanceof Error ? e.message : "Sign in failed.");
         throw e;
       }
@@ -94,11 +113,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applyTokens]
   );
 
-  const signOut = useCallback(() => clear(), [clear]);
+  const signOut = useCallback(() => {
+    const tok = accessToken;
+    if (tok) api.logout(tok);
+    setMustChangePassword(false);
+    clear();
+  }, [accessToken, clear]);
+
+  const clearMustChange = useCallback(() => setMustChangePassword(false), []);
 
   return (
     <AuthContext.Provider
-      value={{ user, accessToken, loading, error, signIn, signOut }}
+      value={{ user, accessToken, loading, error, mustChangePassword, signIn, signOut, clearMustChange }}
     >
       {children}
     </AuthContext.Provider>
