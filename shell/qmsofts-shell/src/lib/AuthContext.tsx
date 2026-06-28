@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMustChangePassword(!!result.mustChangePassword);
         return { mustChangePassword: !!result.mustChangePassword };
       } catch (e) {
-        if (e instanceof api.SessionDecisionRequired) {
+        if (api.isSessionDecisionError(e)) {
           throw e; // let the login screen prompt for replace/logoutAll
         }
         setError(e instanceof Error ? e.message : "Sign in failed.");
