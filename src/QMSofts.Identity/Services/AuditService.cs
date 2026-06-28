@@ -20,6 +20,9 @@ public sealed class AuditService
         _http = http;
     }
 
+    /// <summary>The caller's IP from the current request, if available.</summary>
+    public string? CurrentIp() => _http.HttpContext?.Connection.RemoteIpAddress?.ToString();
+
     public async Task RecordAsync(
         AuthAuditEventType type,
         Guid? userId = null,
