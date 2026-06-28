@@ -3,7 +3,17 @@ import { APP_REGISTRY } from "../lib/appRegistry";
 import { launchApp } from "../lib/handoff";
 import { BrandHeader } from "./BrandHeader";
 
-export function Launcher({ onOpenAdmin }: { onOpenAdmin: () => void }) {
+export function Launcher({
+  onOpenAdmin,
+  onOpenSettings,
+  onOpenAudit,
+  onChangePassword,
+}: {
+  onOpenAdmin: () => void;
+  onOpenSettings: () => void;
+  onOpenAudit: () => void;
+  onChangePassword: () => void;
+}) {
   const { user, signOut } = useAuth();
 
   // localStorage holds the refresh token used for app handoff.
@@ -26,13 +36,14 @@ export function Launcher({ onOpenAdmin }: { onOpenAdmin: () => void }) {
           </p>
           <div className="head-actions">
             {isAdmin && (
-              <button className="btn-small" onClick={onOpenAdmin}>
-                User Admin
-              </button>
+              <>
+                <button className="btn-small" onClick={onOpenAdmin}>Users</button>
+                <button className="btn-small" onClick={onOpenSettings}>Security</button>
+                <button className="btn-small" onClick={onOpenAudit}>Audit</button>
+              </>
             )}
-            <button className="signout" onClick={signOut}>
-              Sign out
-            </button>
+            <button className="btn-small" onClick={onChangePassword}>Password</button>
+            <button className="signout" onClick={signOut}>Sign out</button>
           </div>
         </div>
 
