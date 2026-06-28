@@ -34,6 +34,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<SigningKeyProvider>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuditService>();
+builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<IdentitySeeder>();
 
@@ -76,6 +77,41 @@ builder.Services
                 var keys = ctx.HttpContext.RequestServices.GetRequiredService<SigningKeyProvider>();
                 ctx.Options.TokenValidationParameters.IssuerSigningKey = keys.SecurityKey;
                 return Task.CompletedTask;
+            },
+            // Enforce force-logout and single-session on Identity's own protected
+            // endpoints. Apps (ERES/Parakh) will apply equivalent checks themselves.
+            OnTokenValidated = async ctx =>
+            {
+                var principal = ctx.Principal;
+                if (principal is null) { ctx.Fail("No principal."); return; }
+
+                var idStr = principal.FindFirst(QMSofts.Shared.Auth.QmsClaimTypes.UserId)?.Value;
+                if (!Guid.TryParse(idStr, out var userId)) return; // not a user token
+
+                var db = ctx.HttpContext.RequestServices
+                    .GetRequiredService<QMSofts.Identity.Data.IdentityDbContext>();
+                var user = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                    .FirstOrDefaultAsync(db.Users, u => u.Id == userId);
+                if (user is null) { ctx.Fail("User no longer exists."); return; }
+                if (user.Status != QMSofts.Identity.Models.UserStatus.Active)
+                { ctx.Fail("Account is not active."); return; }
+
+                // Single-session: token's sid must match the user's active session.
+                var sid = principal.FindFirst(QMSofts.Shared.Auth.QmsClaimTypes.SessionId)?.Value;
+                if (!string.IsNullOrEmpty(sid) && !string.IsNullOrEmpty(user.ActiveSessionId)
+                    && sid != user.ActiveSessionId)
+                { ctx.Fail("Session superseded by a newer login."); return; }
+
+                // Force-logout: reject tokens issued before forceLogoutAt.
+                if (user.ForceLogoutAt is { } flo)
+                {
+                    var iatClaim = principal.FindFirst("iat")?.Value;
+                    if (long.TryParse(iatClaim, out var iat))
+                    {
+                        var issuedAt = DateTimeOffset.FromUnixTimeSeconds(iat);
+                        if (issuedAt < flo) { ctx.Fail("Signed out by an administrator."); return; }
+                    }
+                }
             }
         };
     });
