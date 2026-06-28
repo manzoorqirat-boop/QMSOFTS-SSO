@@ -13,7 +13,7 @@ function Gate() {
   const { user, loading, mustChangePassword, clearMustChange } = useAuth();
   const [view, setView] = useState<View>("launcher");
 
-  if (loading) return <div className="loading">Opening the manuscript…</div>;
+  if (loading) return <div className="loading">Initializing secure session…</div>;
   if (!user) return <LoginScreen />;
 
   // Forced password change blocks everything until done.
