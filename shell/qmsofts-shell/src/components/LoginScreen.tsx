@@ -27,7 +27,7 @@ export function LoginScreen() {
       // success → Gate re-renders to launcher / forced-change
     } catch (e) {
       if (api.isSessionDecisionError(e)) {
-        setSessionPrompt({ ip: e.activeSessionIp });
+        setSessionPrompt({ ip: e.data.activeSessionIp ?? null });
       }
       // other errors surface via context `error`
     } finally {
