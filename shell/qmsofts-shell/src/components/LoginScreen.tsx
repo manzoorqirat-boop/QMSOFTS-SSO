@@ -72,12 +72,14 @@ export function LoginScreen() {
           <div className="field">
             <label htmlFor="email">Email</label>
             <input id="email" type="email" autoComplete="username" value={email}
+              placeholder="you@company.com"
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && attempt()} />
           </div>
           <div className="field">
             <label htmlFor="password">Password</label>
             <input id="password" type="password" autoComplete="current-password" value={password}
+              placeholder="Enter your password"
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && attempt()} />
           </div>
