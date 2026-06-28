@@ -28,6 +28,12 @@ public static class QmsClaimTypes
 
     /// <summary>Token version, for forced-revocation scenarios.</summary>
     public const string TokenVersion = "qms_tv";
+
+    /// <summary>Per-app role assignment, value "app:role" e.g. "eres:Approver". Repeatable.</summary>
+    public const string AppRole = "qms_approle";
+
+    /// <summary>Single-session id; apps may reject tokens whose sid is superseded.</summary>
+    public const string SessionId = "qms_sid";
 }
 
 /// <summary>Well-known app keys for the QMSofts suite.</summary>
