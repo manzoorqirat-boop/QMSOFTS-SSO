@@ -13,6 +13,8 @@ public class IdentityDbContext : DbContext
     public DbSet<AppEntitlement> AppEntitlements => Set<AppEntitlement>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<AuthAuditRecord> AuthAuditRecords => Set<AuthAuditRecord>();
+    public DbSet<Setting> Settings => Set<Setting>();
+    public DbSet<ChangeHistory> ChangeHistories => Set<ChangeHistory>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -70,6 +72,35 @@ public class IdentityDbContext : DbContext
             e.HasIndex(a => a.OccurredAt);
             e.HasIndex(a => a.UserId);
             e.HasIndex(a => a.EventType);
+        });
+
+        // PasswordHistory is a list of strings; store as a JSON array column.
+        b.Entity<User>(e =>
+        {
+            e.Property(u => u.PasswordHistory)
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<string>())
+                .Metadata.SetValueComparer(
+                    new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<string>>(
+                        (a, c) => (a ?? new()).SequenceEqual(c ?? new()),
+                        v => v.Aggregate(0, (h, s) => HashCode.Combine(h, s.GetHashCode())),
+                        v => v.ToList()));
+            e.HasIndex(u => u.Status);
+        });
+
+        b.Entity<Setting>(e =>
+        {
+            e.HasIndex(s => s.Key).IsUnique();
+        });
+
+        b.Entity<ChangeHistory>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.Property(c => c.Id).UseIdentityByDefaultColumn();
+            e.HasIndex(c => c.Timestamp);
+            e.HasIndex(c => new { c.EntityType, c.EntityId });
         });
 
         base.OnModelCreating(b);
