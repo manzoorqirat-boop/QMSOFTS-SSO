@@ -26,10 +26,11 @@ public sealed class TokenService
     private int AccessMinutes => _config.GetValue<int?>("QmsAuth:AccessTokenMinutes") ?? 30;
 
     public (string token, DateTimeOffset expiresAt) CreateAccessToken(
-        User user, IEnumerable<string> roles, IEnumerable<string> apps)
+        User user, IEnumerable<string> roles, IEnumerable<string> apps,
+        IDictionary<string, string>? appRoles = null, string? sid = null, int? timeoutMinutes = null)
     {
         var now = DateTimeOffset.UtcNow;
-        var expires = now.AddMinutes(AccessMinutes);
+        var expires = now.AddMinutes(timeoutMinutes ?? AccessMinutes);
 
         var claims = new List<Claim>
         {
@@ -40,9 +41,18 @@ public sealed class TokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
-        // Thin contract: global roles + app entitlements only.
+        // Global roles + app entitlements.
         claims.AddRange(roles.Select(r => new Claim(QmsClaimTypes.Role, r)));
         claims.AddRange(apps.Select(a => new Claim(QmsClaimTypes.AppAccess, a)));
+
+        // Per-app role assignment, emitted as "qms_approle" = "app:role".
+        if (appRoles is not null)
+            claims.AddRange(appRoles.Select(kv =>
+                new Claim(QmsClaimTypes.AppRole, $"{kv.Key}:{kv.Value}")));
+
+        // Session id for single-session enforcement by apps that check it.
+        if (!string.IsNullOrEmpty(sid))
+            claims.Add(new Claim(QmsClaimTypes.SessionId, sid));
 
         var token = new JwtSecurityToken(
             issuer: Issuer,
