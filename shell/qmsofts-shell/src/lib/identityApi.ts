@@ -23,33 +23,38 @@ function authHeaders(token: string) {
   return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 }
 
+// Error shape matching ERES: a plain Error with .status and .data attached, so
+// callers can branch on err.status === 409 && err.data.requiresSessionDecision
+// without depending on instanceof (which is fragile across transpilation).
+export interface ApiError extends Error {
+  status?: number;
+  data?: any;
+}
+
+function makeError(status: number, data: any): ApiError {
+  const err: ApiError = new Error(data?.error || `Request failed (${status}).`);
+  err.status = status;
+  err.data = data;
+  return err;
+}
+
+/** True when an error is the concurrent-session 409 signal. */
+export function isSessionDecisionError(
+  e: unknown
+): e is ApiError & { data: { activeSessionIp: string | null } } {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    (e as ApiError).status === 409 &&
+    (e as ApiError).data?.requiresSessionDecision === true
+  );
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────
 
 export interface LoginResult extends TokenResponse {
   mustChangePassword?: boolean;
   reason?: string;
-}
-
-// Concurrent-session signal (HTTP 409) the caller may act on.
-export class SessionDecisionRequired extends Error {
-  // A plain discriminator flag — reliable even if `instanceof` breaks across
-  // module/transpile boundaries. Check this, not just instanceof.
-  readonly isSessionDecision = true as const;
-  activeSessionIp: string | null;
-  constructor(activeSessionIp: string | null) {
-    super("You are already logged in on another session.");
-    Object.setPrototypeOf(this, SessionDecisionRequired.prototype);
-    this.name = "SessionDecisionRequired";
-    this.activeSessionIp = activeSessionIp;
-  }
-}
-
-/** Reliable type guard for the concurrent-session signal. */
-export function isSessionDecisionError(e: unknown): e is SessionDecisionRequired {
-  return (
-    e instanceof SessionDecisionRequired ||
-    (typeof e === "object" && e !== null && (e as any).isSessionDecision === true)
-  );
 }
 
 export async function login(
@@ -71,13 +76,10 @@ export async function login(
     body = null;
   }
 
-  // Concurrent session — backend returns 409 with requiresSessionDecision.
-  if (res.status === 409 && body?.requiresSessionDecision) {
-    throw new SessionDecisionRequired(body.activeSessionIp ?? null);
-  }
-
+  // Any non-OK response → throw an ERES-style error carrying status + data, so
+  // the caller can detect the 409 concurrent-session signal reliably.
   if (!res.ok) {
-    throw new Error(body?.error ?? `Request failed (${res.status}).`);
+    throw makeError(res.status, body ?? {});
   }
 
   if (body?.loggedOut) return { loggedOut: true };
