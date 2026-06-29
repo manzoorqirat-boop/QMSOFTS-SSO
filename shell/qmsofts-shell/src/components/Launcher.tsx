@@ -69,7 +69,12 @@ export function Launcher({
         </div>
 
         <div className="insight-strip">
-          <span className="insight-icon" aria-hidden="true">◇</span>
+          <span className="insight-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M5 12.5l4.5 4.5L19 7" stroke="currentColor"
+                strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
           <span className="insight-text">
             {entitled.length > 0 ? (
               <>
