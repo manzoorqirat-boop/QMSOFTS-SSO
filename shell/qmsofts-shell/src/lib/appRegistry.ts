@@ -13,13 +13,13 @@ export const APP_REGISTRY: AppDefinition[] = [
     name: "Parakh",
     tagline: "Supplier Quality Management",
     url: import.meta.env.VITE_PARAKH_URL ?? "#",
-    glyph: "پ", // Perso-Arabic pe, for परख / Parakh
+    glyph: "P",
   },
   {
     key: "eres",
     name: "ERES Manager",
     tagline: "Electronic Records & Signatures",
     url: import.meta.env.VITE_ERES_URL ?? "#",
-    glyph: "ح", // for Hastakshar
+    glyph: "E",
   },
 ];
